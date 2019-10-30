@@ -1,0 +1,104 @@
+import os
+import requests
+import re
+import json
+from bs4 import BeautifulSoup
+import pymysql
+import time
+
+# 数据库
+# def create():
+#     db = pymysql.connect(host='localhost', port=3306, user='root', passwd='123456', db='test', charset='utf8')
+#     cursor = db.cursor()
+#     cursor.execute("DROP TABLE IF EXISTS EMPLOYER")
+#     sql = """CREATE TABLE EMPLOYER (
+#             TITLE  CHAR(255)
+#             )"""
+#     cursor.execute(sql)
+#     db.close()
+# def insert(value):
+#     db = pymysql.connect(host='localhost', port=3306, user='root', passwd='123456', db='test', charset='utf8')
+#     cursor = db.cursor()
+#     sql = """insert into test(title) \
+#                 values(%s)"""
+#     try:
+#         cursor.execute(sql, value)
+#         db.commit()
+#         print('插入数据成功')
+#     except:
+#         db.rollback()
+#         print("插入数据失败")
+#     db.close()
+
+def get_url(page):
+    head = 'https://www1.szu.edu.cn/mailbox/list.asp?page='
+    tail = '&leader=%CE%CA%CC%E2%CD%B6%CB%DF&tag='
+    variable = str(page)
+    url = head + variable + tail
+    return url
+
+# 爬虫：
+def get_title(url):
+    # 伪装成浏览器，防止封ip
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.120 Safari/537.36',
+    }
+    # 进行认证，不然抓取到的不是真的页面
+    # 如果访问不了可能是cookies过期了
+
+    cookies = {
+        'ASPSESSIONIDCARADRTS': 'HGPNDEIDIANEDLDNIAJHAPCN',
+    }
+    # 防止爬虫突然断掉，使其重复执行访问
+    tries = 6
+    while tries > 0:
+        try:
+            rsp = requests.get(url, headers=headers, cookies=cookies)
+            break
+        except Exception as e:
+            tries -= 1
+            # print(e)
+    # 防止中文乱码
+    rsp.encoding = rsp.apparent_encoding
+    data = rsp.text
+    # 生成soup对象进行标签筛选
+    soup = BeautifulSoup(data, 'lxml')
+    soup_tag = soup.find_all('a', target='_blank', class_="fontcolor3")
+    title = []
+    for item in soup_tag:
+        name = item.text[1::]
+        title.append(name)
+    # title.pop()
+    #print(title)
+
+    return title
+
+def main():
+    title_list = []
+    db = pymysql.connect(host='localhost', port=3306, user='root', passwd='123456', db='test', charset='utf8')
+    cursor = db.cursor()
+
+    for page in range(1, 140):
+        link = get_url(page)
+        titles = get_title(link)
+        title_list += titles
+
+    # 写入txt文件中
+    for title in title_list:
+            f = open('C:/Users/DELL/Desktop/name1.txt', 'a', encoding="utf-8")
+            f.write(title + '\n')
+            try:
+               sql = """insert into test(title) \
+                            values(%s)"""
+               cursor.execute(sql, title)
+               db.commit()
+               print('成功')
+            except:
+               db.rollback()
+               print('失败')
+    db.close()
+
+# ---------------------------------------------------------------------------------
+
+if __name__ == '__main__':
+    main()
